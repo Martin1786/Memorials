@@ -281,6 +281,13 @@
     margin:6px 0 18px; font-family:var(--font-mono);
   }
   .detail-meta span b{ color:var(--text-ink); font-weight:600; }
+  .survey-ref-link{
+    display:inline-flex; align-items:center; gap:3px; background:none; border:none; padding:0;
+    font-family:var(--font-mono); font-size:12.5px; font-weight:600; color:var(--moss-deep);
+    cursor:pointer; border-bottom:1px dashed var(--moss-deep);
+  }
+  .survey-ref-link:hover{ color:var(--brass-deep); border-bottom-color:var(--brass-deep); }
+  .survey-ref-link svg{ flex-shrink:0; }
 
   .person-block{
     padding:16px 0; border-top:1px solid var(--parchment-2);
@@ -382,6 +389,14 @@
   }
   .map-pin:hover{ background:var(--moss-deep); transform:rotate(-45deg) scale(1.25); z-index:5; }
   .map-pin.dimmed{ opacity:.18; pointer-events:none; }
+  .map-pin.highlighted{
+    background:var(--brass); border-color:#fff; z-index:20;
+    animation:pinPulse 1.3s ease-in-out infinite;
+  }
+  @keyframes pinPulse{
+    0%, 100% { box-shadow:0 2px 6px rgba(0,0,0,.4), 0 0 0 0 rgba(201,161,92,.55); transform:rotate(-45deg) scale(1.3); }
+    50% { box-shadow:0 2px 6px rgba(0,0,0,.4), 0 0 0 10px rgba(201,161,92,0); transform:rotate(-45deg) scale(1.5); }
+  }
   .map-hint{
     margin-top:10px; font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); text-align:center;
   }
@@ -1029,7 +1044,7 @@
           '<span>Section <b>' + esc(plot.section) + '</b></span>' +
           (plot.oldPlot ? '<span>Old plot no. <b>' + esc(plot.oldPlot) + '</b></span>' : '') +
           (plot.newPlot ? '<span>New plot no. <b>' + esc(plot.newPlot) + '</b></span>' : '') +
-          (plot.xy ? '<span>Survey ref <b>' + esc(plot.xy) + '</b></span>' : '') +
+          (plot.xy ? '<span>Survey ref <button class="survey-ref-link" id="surveyRefBtn" type="button">' + esc(plot.xy) + ' <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></button></span>' : '') +
         '</div>' +
         peopleHtml +
         '<div class="detail-actions">' +
@@ -1043,6 +1058,8 @@
     document.getElementById('detailCloseBtn').addEventListener('click', closeDetail);
     document.getElementById('closeBtn2').addEventListener('click', closeDetail);
     document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+    var surveyBtn = document.getElementById('surveyRefBtn');
+    if(surveyBtn) surveyBtn.addEventListener('click', function(){ focusMapOnPlot(plot); });
   }
 
   function closeDetail(){
@@ -1076,15 +1093,19 @@
   var mapTab = document.getElementById('mapTab');
   var tabs = { browse: mainBrowse, glossary: glossaryTab, stats: statsTab, map: mapTab };
 
-  document.getElementById('tabbar').addEventListener('click', function(e){
-    var btn = e.target.closest('.tabbtn');
-    if(!btn) return;
-    document.querySelectorAll('.tabbtn').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-    var target = btn.getAttribute('data-tab');
+  function switchTab(target){
+    document.querySelectorAll('.tabbtn').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab') === target);
+    });
     Object.keys(tabs).forEach(function(k){ tabs[k].style.display = (k===target) ? (k==='browse'?'grid':'block') : 'none'; });
     if(target === 'stats') renderStats();
     if(target === 'map') initMap();
+  }
+
+  document.getElementById('tabbar').addEventListener('click', function(e){
+    var btn = e.target.closest('.tabbtn');
+    if(!btn) return;
+    switchTab(btn.getAttribute('data-tab'));
   });
 
   // ---------- glossary ----------
@@ -1152,6 +1173,7 @@
   var mapPinsEl = document.getElementById('mapPins');
   var mapZoom = 1, mapPanX = 0, mapPanY = 0;
   var MAP_MIN_ZOOM = 0.5, MAP_MAX_ZOOM = 4;
+  var highlightedPlotCode = null;
 
   function applyMapTransform(){
     mapCanvas.style.transform = 'translate(' + mapPanX + 'px,' + mapPanY + 'px) scale(' + mapZoom + ')';
@@ -1187,7 +1209,9 @@
       if(!xy) return;
       var pin = document.createElement('div');
       var isMatch = filteredCodes[plot.plotCode];
-      pin.className = 'map-pin' + (followFilters && !isMatch ? ' dimmed' : '');
+      var isHighlighted = plot.plotCode === highlightedPlotCode;
+      pin.className = 'map-pin' + (followFilters && !isMatch && !isHighlighted ? ' dimmed' : '') + (isHighlighted ? ' highlighted' : '');
+      pin.setAttribute('data-plot', plot.plotCode);
       pin.style.left = xy.x + '%';
       pin.style.top = xy.y + '%';
       var names = plotDisplayNames(plot);
@@ -1204,10 +1228,34 @@
     document.getElementById('mapPinCount').textContent = shown;
   }
 
+  function focusMapOnPlot(plot){
+    var xy = parseXY(plot.xy);
+    highlightedPlotCode = plot.plotCode;
+    closeDetail();
+    switchTab('map');
+
+    function doFocus(){
+      renderMapPins();
+      if(!xy){ showToast('No survey position recorded for this plot.', 'error'); return; }
+      var vw = mapViewport.clientWidth, vh = mapViewport.clientHeight;
+      var imgEl = document.getElementById('mapImg');
+      var imgH = imgEl.offsetHeight || (mapCanvas.offsetHeight) || 3139;
+      mapZoom = Math.max(mapZoom, 1.8);
+      var px = (xy.x / 100) * 1400;
+      var py = (xy.y / 100) * imgH;
+      mapPanX = vw / 2 - px * mapZoom;
+      mapPanY = vh / 2 - py * mapZoom;
+      applyMapTransform();
+    }
+    // let the tab actually become visible (display:block) before measuring viewport size
+    requestAnimationFrame(function(){ requestAnimationFrame(doFocus); });
+  }
+
   function initMap(){
     renderMapPins();
     if(mapInited){ return; }
     mapInited = true;
+
 
     var img = document.getElementById('mapImg');
     function afterImgReady(){ centerMap(); }
