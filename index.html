@@ -964,7 +964,7 @@
 
     card.innerHTML =
       '<div class="plot-top">' +
-        '<span class="plot-code">Plot ' + esc(plot.plotCode) + '</span>' +
+        '<span class="plot-code">Plot ' + esc(plot.newPlot != null ? plot.newPlot : plot.plotCode) + '</span>' +
         '<span class="plot-section-tag">Section ' + esc(plot.section) + '</span>' +
       '</div>' +
       '<div class="plot-names">' + namesHtml + '</div>' +
