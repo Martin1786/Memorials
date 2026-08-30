@@ -358,7 +358,7 @@
   .lightbox-viewport.zoomed{ cursor:zoom-out; }
   .lightbox-viewport img{
     position:absolute; top:50%; left:50%; max-width:90vw; max-height:80vh;
-    transform-origin:center center; user-select:none; pointer-events:none;
+    transform-origin:center center; user-select:none;
     box-shadow:0 20px 60px rgba(0,0,0,.5); border-radius:2px;
   }
 
@@ -1170,8 +1170,8 @@
   document.getElementById('lightboxZoomIn').addEventListener('click', function(){ lbZoomAt(1.4); });
   document.getElementById('lightboxZoomOut').addEventListener('click', function(){ lbZoomAt(1/1.4); });
   document.getElementById('lightboxZoomReset').addEventListener('click', function(){ lbZoom = 1; lbPanX = 0; lbPanY = 0; applyLightboxTransform(); });
-  lightboxOverlay.addEventListener('click', function(e){ if(e.target === lightboxOverlay) closeLightbox(); });
-  lightboxViewport.addEventListener('click', function(e){ if(e.target === lightboxViewport) closeLightbox(); });
+  lightboxOverlay.addEventListener('click', function(e){ if(e.target === lightboxOverlay && !lbDragMoved) closeLightbox(); });
+  lightboxViewport.addEventListener('click', function(e){ if(e.target === lightboxViewport && !lbDragMoved) closeLightbox(); });
   document.addEventListener('keydown', function(e){
     if(!lightboxOverlay.classList.contains('open')) return;
     if(e.key === 'Escape') closeLightbox();
